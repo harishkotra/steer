@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steer-console"
+version = "0.1.0"
+description = "Real-time vector steering console for live prose generation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["llm", "activation-steering", "interpretability", "writing", "mlx"]
+dependencies = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
+
+[project.urls]
+Homepage = "https://github.com/harishkotra/steer"
+
+[project.optional-dependencies]
+mlx = ["mlx-lm>=0.18"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+steer = "steer.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["steer*"]
+
+[tool.setuptools.package-data]
+steer = ["web/*"]

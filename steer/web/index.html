@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>steer</title>
+<link rel="stylesheet" href="/static/console.css" />
+</head>
+<body>
+<div id="stage">
+  <svg id="overlay" aria-hidden="true"></svg>
+
+  <div id="roll">
+    <div id="rail"></div>
+    <div id="prose"><span id="text"></span><span id="caret"></span></div>
+  </div>
+
+  <div id="badges"></div>
+
+  <div id="hint">space generate · tab knobs · select text to steer · r reset</div>
+
+  <aside id="dock" class="hidden">
+    <header>
+      <span>steer</span>
+      <span id="dock-note">—</span>
+    </header>
+    <section id="vec-list"></section>
+    <form id="vec-add" autocomplete="off">
+      <input name="label" placeholder="label" value="tone" />
+      <input name="plus" placeholder="toward" value="tender" />
+      <input name="minus" placeholder="away" value="harsh" />
+      <button>+ vector</button>
+    </form>
+    <section id="box-list"></section>
+    <footer>
+      <label><input type="checkbox" id="autogen" checked /> keep writing</label>
+      <button id="reset">reset</button>
+    </footer>
+  </aside>
+
+  <footer id="status"></footer>
+</div>
+<script src="/static/console.js"></script>
+</body>
+</html>
