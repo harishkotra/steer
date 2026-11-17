@@ -187,16 +187,265 @@ html, body {
 
 /* ---------- camera (removed: the console reads text, not the room) ---------- */
 
-/* ---------- hint ---------- */
+/* ---------- captions + controls (the first-run problem, fixed) ---------- */
 
-#hint {
+#railcap {
   position: absolute;
-  right: 3vw;
-  bottom: 5.6vh;
-  color: #2f2f2f;
-  font-size: 10.5px;
+  left: 36px;
+  top: calc(10.5vh - 15px);
+  font-size: 9.5px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #3d3d3d;
+  user-select: none;
+}
+
+#controls {
+  position: absolute;
+  left: 36px;
+  bottom: 7.2vh;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+}
+
+#controls button {
+  font: inherit;
+  font-size: 11px;
+  color: #cfcfcf;
+  background: #101010;
+  border: 1px solid #2b2b2b;
+  border-radius: 3px;
+  padding: 5px 13px;
+  cursor: pointer;
+  letter-spacing: .02em;
+}
+
+#controls button:hover { border-color: #4a4a4a; color: #fff; }
+#controls #go { border-color: #52302a; color: #e6a294; }
+#controls #go:hover { border-color: var(--red); color: #ffd9d2; }
+#controls #halt { border-color: #3a2a12; color: var(--orange); }
+#controls #tourbtn { padding: 5px 9px; color: #6d6d6d; }
+
+.kbd {
+  font-size: 9.5px;
+  color: #575757;
+  padding: 1px 2px;
+  letter-spacing: .04em;
+  /* a key hint, not a button: a bordered chip gets clicked */
+}
+
+#lede {
+  position: absolute;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  max-width: 620px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #6e6e6e;
+  user-select: none;
   pointer-events: none;
 }
+
+#lede b { color: #b9b9b9; font-weight: 500; }
+
+/* ---------- tour ---------- */
+
+#tour {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 3, 3, .82);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+#tour.hidden { display: none; }
+
+#tour .card {
+  width: 560px;
+  background: #0a0a0a;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  padding: 26px 30px 22px;
+  color: #c4c4c4;
+  font-size: 12.5px;
+  line-height: 1.62;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .7);
+}
+
+#tour h1 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #ededed;
+}
+
+#tour .lede { margin: 0 0 16px; color: #8d8d8d; }
+#tour ol { margin: 0 0 14px; padding-left: 18px; }
+#tour li { margin-bottom: 9px; }
+#tour li b { color: #e4e4e4; font-weight: 500; }
+#tour .foot { margin: 0 0 16px; color: #7b7b7b; font-size: 11.5px; border-top: 1px solid #1d1d1d; padding-top: 12px; }
+#tour .miss { color: var(--orange); }
+
+#tour #tourdone {
+  font: inherit;
+  font-size: 11.5px;
+  background: #161616;
+  color: #dedede;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+#tour #tourdone:hover { border-color: var(--red); color: #fff; }
+
+/* ---------- blind test ---------- */
+
+#blind {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 3, 3, .86);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 45;
+}
+
+#blind.hidden { display: none; }
+
+#blind .card {
+  width: 860px;
+  max-width: calc(100vw - 60px);
+  background: #0a0a0a;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  padding: 24px 28px 18px;
+  color: #c4c4c4;
+  font-size: 12.5px;
+  line-height: 1.62;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .7);
+}
+
+#blind h1 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #ededed;
+}
+
+#blind .lede { margin: 0 0 16px; color: #8d8d8d; max-width: 74ch; }
+
+#blind .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+
+#blind .side {
+  border: 1px solid #1f1f1f;
+  border-radius: 4px;
+  padding: 12px 14px 12px;
+  background: #0d0d0d;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#blind .side.picked { border-color: #3d3d3d; }
+#blind .side.steered { border-color: var(--red); }
+#blind .side.wrong { opacity: .72; }
+
+#blind .tag {
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #848484;
+}
+
+#blind .body {
+  margin: 0;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #d6d6d6;
+  min-height: 7.5em;
+}
+
+#blind .body.loading { color: #4d4d4d; }
+
+#blind .pick,
+#blind #blindagain,
+#blind #blindclose {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 11.5px;
+  background: #161616;
+  color: #dedede;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+
+/* the pick is the whole point of the panel: it gets the weight */
+#blind .pick {
+  margin-top: auto;
+  align-self: stretch;
+  text-align: center;
+  padding: 8px 14px;
+  background: #1c1c1c;
+  border-color: #5a5a5a;
+  color: #fff;
+}
+
+#blind .pick:hover, #blind #blindagain:hover, #blind #blindclose:hover {
+  border-color: var(--red); color: #fff;
+}
+
+/* close is an escape hatch, not an action: keep it quiet */
+#blind #blindclose { border-color: #232323; color: #7c7c7c; }
+
+#blind .side.done .pick { display: none; }
+
+#blind .out {
+  margin-top: 14px;
+  border-top: 1px solid #1d1d1d;
+  padding-top: 12px;
+  color: #b6b6b6;
+}
+
+#blind .out b { color: #ededed; font-weight: 500; }
+#blind .out .ok { color: var(--red); }
+#blind .out .bar {
+  height: 3px;
+  background: #1c1c1c;
+  margin: 6px 0 2px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+#blind .out .bar i { display: block; height: 100%; background: var(--red); }
+#blind .out .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+#blind .out .m { font-size: 11px; color: #777; }
+#blind .out .m code { color: #bbb; font-size: 11px; }
+
+#blind .row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+#blind #blind-tally { margin-right: auto; font-size: 11px; color: #6c6c6c; }
+
 
 /* ---------- status ---------- */
 
@@ -222,6 +471,16 @@ html, body {
 #status .red { color: var(--red); }
 #status .grow { flex: 1; }
 #status .err { color: var(--red); }
+
+/* credit line: last item in the bar, quiet, but a real link */
+#status .by { color: #454545; }
+#status .by a {
+  color: #6b6b6b;
+  text-decoration: none;
+  border-bottom: 1px solid #242424;
+  pointer-events: auto;
+}
+#status .by a:hover { color: #d0d0d0; border-color: var(--red); }
 
 /* ---------- dock ---------- */
 
@@ -271,9 +530,9 @@ html, body {
 #dock .vec .poles {
   display: flex;
   justify-content: space-between;
-  color: #4f4f4f;
+  color: #7b7b7b;
   font-size: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 #dock input[type=range] {
@@ -284,8 +543,9 @@ html, body {
   margin: 0;
 }
 #dock input[type=range]::-webkit-slider-runnable-track {
-  height: 1px;
-  background: #2c2c2c;
+  height: 2px;
+  background: #3a3a3a;
+  border-radius: 1px;
 }
 #dock input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -367,3 +627,135 @@ html, body {
 #dock .empty { color: #3a3a3a; font-size: 10.5px; padding: 6px 0; }
 
 ::selection { background: #4a4a4a; color: #fff; }
+
+/* ---------- provenance, attention lift, verification ---------- */
+#dock .vec .src {
+  font-size: 9px;
+  line-height: 1.35;
+  color: #4e4e4e;
+  margin: 3px 0 1px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+#dock .vec .src em { font-style: normal; color: #6b5030; }
+#dock .box span em { font-style: normal; margin-left: 4px; }
+#dock .box span em.held { color: #7d9b6a; }
+#dock .box span em.weak { color: #5a5a5a; }
+
+#ledger {
+  position: absolute;
+  left: 36px;
+  bottom: 13.4vh;
+  width: 500px;
+  font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #6a6a6a;
+  pointer-events: none;
+  cursor: default;
+}
+#ledger header {
+  color: #8a8a8a;
+  letter-spacing: .08em;
+  text-transform: lowercase;
+  border-bottom: 1px solid #161616;
+  padding-bottom: 3px;
+  margin-bottom: 4px;
+}
+#ledger header em { font-style: normal; color: #4d4d4d; }
+#ledger .row { display: flex; gap: 6px; align-items: baseline; }
+#ledger .row .mk { color: #4a4a4a; width: 8px; flex: none; }
+#ledger .row.ok .mk { color: var(--red); }
+#ledger .row .vx { color: #9a6a58; flex: none; }
+#ledger .row.ok .vx { color: var(--orange); }
+#ledger .row .sh { color: #4d4d4d; flex: none; }
+#ledger .row .tx {
+  min-width: 0;
+  color: #565656;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* clicking a claim highlights the sentence it is talking about */
+#prose .w.flash {
+  background: rgba(232, 80, 58, .2);
+  box-shadow: 0 0 0 1px rgba(232, 80, 58, .3);
+}
+
+/* a claim you cannot read is not evidence: wrap it, and let it be clicked */
+#ledger .row {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#ledger .row:hover { background: rgba(255, 255, 255, .03); }
+
+#ledger .row .tx {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.45;
+  display: block;
+}
+
+/* the quote under a dial is the evidence for it: readable, and it opens the
+   sentence it came from */
+#dock .src {
+  margin-top: 6px;
+  color: #7d7d7d;
+  font-size: 9.5px;
+  line-height: 1.45;
+  max-height: 5.8em;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+#dock .src:hover { color: #bdbdbd; }
+#dock .src em { font-style: normal; color: #9a7b3a; }
+
+/* the add-dial form: say what the three fields are */
+#dock form {
+  display: flex;
+  gap: 5px;
+  margin-top: 14px;
+  border-top: 1px solid #1b1b1b;
+  padding-top: 12px;
+}
+
+#dock form input {
+  min-width: 0;
+  flex: 1;
+  font: inherit;
+  font-size: 10px;
+  color: #cfcfcf;
+  background: #0e0e0e;
+  border: 1px solid #242424;
+  border-radius: 3px;
+  padding: 4px 6px;
+}
+
+#dock form button {
+  font: inherit;
+  font-size: 10px;
+  color: #b9b9b9;
+  background: #141414;
+  border: 1px solid #2b2b2b;
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#dock .cap {
+  color: #5c5c5c;
+  font-size: 9.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-top: 16px;
+}
+
+#ledger .row .tx { color: #8e8e8e; }
+#ledger .foot { margin-top: 7px; color: #4c4c4c; font-size: 9px; letter-spacing: .02em; }
+#controls #go { border-color: #6d3a30; color: #f0b7ab; }
+#controls #tourbtn { padding: 5px 11px; color: #8a8a8a; }

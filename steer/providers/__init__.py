@@ -20,6 +20,6 @@ def make_provider(kind: str = "mock", **kwargs) -> Provider:
         return MLXProvider(
             model_id=kwargs.get("model") or "mlx-community/Qwen2.5-3B-Instruct-4bit",
             layer=kwargs.get("layer"),
-            scale=kwargs.get("scale") or 6.0,
+            scale=kwargs.get("scale") or 0.10,
         )
     raise SystemExit(f"unknown provider {kind!r}: pick mock, api or mlx")

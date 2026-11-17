@@ -10,33 +10,85 @@
 <div id="stage">
   <svg id="overlay" aria-hidden="true"></svg>
 
+  <div id="railcap">how hard each line pulls on the next one</div>
+  <div id="lede">You set the dials on the right. It writes the next sentences. Bottom left says which dial each sentence obeyed.</div>
+
   <div id="roll">
     <div id="rail"></div>
     <div id="prose"><span id="text"></span><span id="caret"></span></div>
   </div>
 
   <div id="badges"></div>
+  <div id="ledger"></div>
 
-  <div id="hint">space generate · tab knobs · select text to steer · r reset</div>
+  <div id="controls">
+    <button id="go" type="button">write</button>
+    <span class="kbd">or press space</span>
+    <button id="halt" type="button" hidden>stop</button>
+    <button id="tourbtn" type="button" title="show the guided tour again">what is this?</button>
+    <button id="blindbtn" type="button" title="two continuations, one steered — can you tell which?">blind test</button>
+  </div>
 
   <aside id="dock" class="hidden">
     <header>
-      <span>steer</span>
+      <span>your dials</span>
       <span id="dock-note">—</span>
     </header>
     <section id="vec-list"></section>
+    <div class="cap">add your own dial — an axis you want pushed</div>
     <form id="vec-add" autocomplete="off">
-      <input name="label" placeholder="label" value="tone" />
-      <input name="plus" placeholder="toward" value="tender" />
-      <input name="minus" placeholder="away" value="harsh" />
-      <button>+ vector</button>
+      <input name="label" placeholder="name" value="" />
+      <input name="plus" placeholder="toward…" value="" />
+      <input name="minus" placeholder="away from…" value="" />
+      <button>+ dial</button>
     </form>
     <section id="box-list"></section>
     <footer>
-      <label><input type="checkbox" id="autogen" checked /> keep writing</label>
-      <button id="reset">reset</button>
+      <label title="keep writing as soon as the last sentences finish"><input type="checkbox" id="autogen" /> auto-continue</label>
+      <button id="reset" title="throw away the story and the dials, start from the seed passage">start over</button>
     </footer>
   </aside>
+
+  <div id="tour" class="hidden">
+    <div class="card">
+      <h1>steer</h1>
+      <p class="lede">A writing console where the knobs are made from your own text, and every knob is checked.</p>
+      <ol>
+        <li><b>Press <span class="kbd">space</span> or click write.</b> The model adds the next sentences to the middle of the screen.</li>
+        <li><b>Left numbers</b> are how hard each line pulls on the next one. Long bar = the story keeps coming back to it.</li>
+        <li><b>Right dials</b> are mined from the passage: two ends of an axis and how hard to push. Drag one, then write again.</li>
+        <li><b>Bottom left</b> reads the new sentences back and says which dial each one actually landed on. <span class="miss">unclaimed</span> means the dial did nothing.</li>
+      </ol>
+      <p class="foot">To force a word into the next paragraph: select it in the prose. It becomes an attention box.</p>
+      <p class="foot">The idea comes from <a href="https://github.com/chuanqisun/spaceship" target="_blank" rel="noopener">Spaceship IDE by Chuanqi Sun</a>. Everything measurable here — the audit, the blind test, the mined axes — is this project's addition.</p>
+      <button id="tourdone" type="button">got it</button>
+    </div>
+  </div>
+
+  <div id="blind" class="hidden">
+    <div class="card">
+      <h1>blind test</h1>
+      <p class="lede">The passage you have was continued twice from the same words. One of the two was written with a dial turned up. Pick the one the console was steering — then see what the auditor measured. Click a card, or press <span class="kbd">L</span> / <span class="kbd">R</span>.</p>
+      <div class="pair">
+        <div class="side" data-side="left">
+          <div class="tag">left</div>
+          <p class="body"></p>
+          <button type="button" class="pick">this one</button>
+        </div>
+        <div class="side" data-side="right">
+          <div class="tag">right</div>
+          <p class="body"></p>
+          <button type="button" class="pick">this one</button>
+        </div>
+      </div>
+      <div id="blind-out" class="out" hidden></div>
+      <div class="row">
+        <span id="blind-tally"></span>
+        <button id="blindagain" type="button" hidden>another round</button>
+        <button id="blindclose" type="button">close</button>
+      </div>
+    </div>
+  </div>
 
   <footer id="status"></footer>
 </div>

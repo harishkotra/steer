@@ -180,3 +180,103 @@ def test_lexicon_buckets_stay_in_their_range():
     assert abs(neutral - 0.5) < 0.06
     tense, calm = lexicon.pair_score(HARSH, "tense", "calm")
     assert tense > 0.6 and calm < 0.4
+
+
+# ---- the concept, not the look: vectors are mined, boxes are measured ----
+
+def test_vectors_are_mined_from_the_passage_not_a_fixed_set():
+    from steer import propose
+    from steer.corpus import SEEDS
+
+    doc = SEEDS["keeper"]
+    axes = propose.propose(doc)
+    assert axes, "the passage should justify at least one axis"
+    for ax in axes:
+        assert ax["label"] in {"focus", "tone", "tension"}
+        assert ax["source"].strip(), "every vector must carry the span it came from"
+    labels = {a["label"] for a in axes}
+    assert "focus" in labels, "the passage names people, so focus is derivable"
+
+
+def test_focus_pole_is_a_name_that_appears_in_the_text():
+    from steer import propose
+    from steer.corpus import SEEDS
+
+    doc = SEEDS["keeper"]
+    ax = propose.focus_axis(doc)
+    assert ax is not None
+    assert ax["plus"] in doc and ax["minus"] in doc
+    assert ax["attested"] is True
+
+
+def test_a_single_sided_axis_is_flagged_rather_than_invented():
+    from steer import propose
+
+    doc = (
+        "The room was warm and soft and kind. She held the cup close and smiled "
+        "at nothing in particular, twice, before the kettle spoke again to her."
+    )
+    ax = propose.register_axis(doc, "tone")
+    assert ax is not None
+    assert ax["attested"] is False, "only the tender side is in this text"
+    assert ax["minus"] == "somber"
+
+
+def test_verification_attributes_sentences_and_admits_the_gaps():
+    from steer import auditor
+    from steer.state import Console
+
+    c = Console()
+    c.doc = (
+        "He was warm and soft with the boy, and spoke gently of the morning. "
+        "The cold grey water slapped the rocks and the wind bit through the door. "
+        "A sentence about arithmetic and nothing else whatsoever in it."
+    )
+    c.add_vector("tone", "warm", "cold", 0.5)
+    out = auditor.verify(c)
+    assert out["counted"] == 3
+    assert 1 <= out["claimed"] <= 3
+    assert any(claim["realized"] for claim in out["claims"])
+    assert any(not claim["realized"] for claim in out["claims"])
+
+
+def test_attention_lift_measures_whether_the_box_worked():
+    from steer import auditor
+    from steer.state import Console
+
+    c = Console()
+    before = "The keeper walked out along the wall and looked at the sea for a while. "
+    c.doc = before
+    c.add_box("lantern oil", 0, 12, weight=0.9)
+    generated = " He filled the lantern with oil and carried the lantern oil up the stair."
+    c.doc = before + generated
+    out = auditor.attention_lift(c, generated)
+    assert out and out[0]["lift"] > 1.0
+    assert out[0]["held"] is True
+
+
+def test_rail_scores_attention_to_what_comes_next():
+    from steer import auditor
+    from steer.state import Console
+
+    c = Console()
+    c.doc = (
+        "The keeper set the brass telescope on the sill and squared it to the horizon. "
+        "Beyond the glass of the brass telescope the horizon held a light that should not be there. "
+        "He said nothing at all and the evening simply went on being an evening."
+    )
+    segs = auditor.audit(c)["segments"]
+    assert len(segs) >= 2
+    # the span whose words are picked up later must outscore the dead one
+    assert max(s["score"] for s in segs) > 0.25
+
+
+def test_a_clipped_sentence_ends_on_a_word_boundary():
+    """A quote cut mid-word reads as a rendering bug, not as a quote."""
+    long = ("The keeper climbed the stairs the way he had every night for nineteen years, "
+            "and the lamp was still warm, and the window was still dark, and the sea was still out there")
+    out = auditor._clip(long)
+    assert out.endswith("…")
+    assert out[:-1].rstrip()[-1].isalpha()
+    assert " " + out[:-1].split()[-1] + " " in long + " "
+    assert auditor._clip("short one.") == "short one."

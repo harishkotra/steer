@@ -122,13 +122,37 @@ class MLXProvider(Provider):
         self._built[key] = d
         return d
 
-    def arm(self, console: Console, rebuild: bool = False) -> None:
-        """Rebuild and install the combined offset for the next forward pass."""
+    def build_attention_delta(self, console: Console, box, force: bool = False):
+        """The offset that makes the model attend to a boxed span.
+
+        Contrastive, like the voice vectors: hidden state with the span held
+        in front of the model minus the hidden state without it.  Adding that
+        direction back is the activation-space version of "pay attention to
+        these words".
+        """
         mx = self._mx
+        key = ("attn", box.text.strip(), round(box.weight, 2))
+        if not force and key in self._built:
+            return self._built[key]
+        ctx = steerer.anchor_text(console, 700)
+        with_box = f"{ctx}\n\n> The next line keeps these words live: {box.text.strip()}\n\nNext line:"
+        without = f"{ctx}\n\nNext line:"
+        d = self._hidden(with_box) - self._hidden(without)
+        unit = d / (mx.linalg.norm(d) + 1e-6)
+        # a box is an explicit instruction, not a suggestion, so its floor is
+        # above the voice-vector default: weight 0.5 -> 1.0 * scale
+        d = unit * (self.scale * (0.5 + max(0.0, box.weight)) * getattr(self, "_ref_norm", 1.0))
+        self._built[key] = d
+        return d
+
+    def arm(self, console: Console, rebuild: bool = False) -> None:
+        """Install the combined offset: voice vectors and attention boxes."""
         total = None
         for v in console.active:
-            d = self.build_delta(console, v, force=rebuild)
-            term = d * (v.magnitude)
+            term = self.build_delta(console, v, force=rebuild) * v.magnitude
+            total = term if total is None else total + term
+        for box in console.boxes:
+            term = self.build_attention_delta(console, box, force=rebuild)
             total = term if total is None else total + term
         _HOOKS[id(self.layer)] = (total, None)
 
@@ -167,6 +191,14 @@ class MLXProvider(Provider):
 
     def _build_prompt(self, console: Console) -> str:
         head = steerer.anchor_text(console, 1200)
+        boxed = [b.text.strip() for b in sorted(console.boxes, key=lambda b: -b.weight) if b.text.strip()]
+        if boxed:
+            # the offset carries the box in activation space; the prompt says it
+            # in words too, which is the only channel the API backend has
+            head += (
+                "\n\nThe next sentences must keep these words live without quoting them: "
+                + ", ".join(f'"{t}"' for t in boxed[:3])
+            )
         system = (
             "You are a novelist continuing a passage already in progress. "
             "Write only the next sentences. Do not repeat, quote or summarise the "
@@ -195,6 +227,8 @@ class MLXProvider(Provider):
         last_version = console.version
         produced = 0
         buf = ""
+        gen_ids: list[int] = []
+        gen_text = ""
         stop = self.tokenizer.encode("\n\nUser") or []
 
         for _ in range(max_tokens):
@@ -207,7 +241,12 @@ class MLXProvider(Provider):
             tok_id = int(tok.item()) if hasattr(tok, "item") else int(tok[0])
             if tok_id == self.tokenizer.eos_token_id:
                 break
-            text = self.tokenizer.decode([tok_id])
+            # decode the whole generated suffix and diff it: decoding one token
+            # at a time loses the word-boundary space ("inhabitedthe shadows")
+            gen_ids.append(tok_id)
+            full = self.tokenizer.decode(gen_ids)
+            text = full[len(gen_text):]
+            gen_text = full
             produced += 1
             buf += text
             if len(buf) >= 4 or text.endswith((" ", ".", ",", "\n")):

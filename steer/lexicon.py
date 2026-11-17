@@ -120,6 +120,12 @@ def pair_score(text: str, plus: str, minus: str) -> tuple[float, float]:
     toks = [w for w in words(text) if w not in STOP]
 
     def hits(pole: str) -> int:
+        # a pole may arrive as a whole register ("soft warm gentle …") once the
+        # audit scores effect rather than the literal seed word
+        if " " in pole.strip():
+            termset = {w for w in pole.lower().split() if w}
+            stems = {w[:5] for w in termset if len(w) >= 5}
+            return sum(1 for w in toks if w in termset or (len(w) >= 5 and w[:5] in stems))
         axis = axis_for(pole)
         if axis is None:
             stem = pole.lower()[:6]

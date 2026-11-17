@@ -1,8 +1,41 @@
+# python
 .venv/
+venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
-dist/
-build/
 *.egg-info/
+build/
+dist/
+.eggs/
+
+# test + tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# editors / os
 .DS_Store
+.idea/
+.vscode/
+*.swp
+
+# local run artefacts: logs, pids, scratch screenshots
+*.log
+*.pid
+tmp/
+scratch/
+
+# model weights and caches (large, never committed)
+models/
+*.safetensors
+*.gguf
+.cache/
+
+# secrets: every key is read from the environment, never from a file
+.env
+.env.*
+*.pem

@@ -43,6 +43,9 @@ class SteerVector:
     target: float | None = None
     id: str = field(default_factory=lambda: new_id("v"))
     delta: object | None = None
+    source: str = ""            # the span of the passage this axis came from
+    attested: bool = True       # False when only one pole appears in the text
+    manual: bool = False        # user retuned it, so stop re-proposing it
 
     @property
     def pole(self) -> str:
@@ -63,12 +66,18 @@ class SteerVector:
             "pole": self.pole,
             "strength": round(self.strength, 3),
             "live": self.delta is not None,
+            "source": self.source,
+            "attested": self.attested,
+            "manual": self.manual,
         }
 
 
 @dataclass
 class Console:
     doc: str = ""
+    gen_at: int = 0
+    generating: bool = False
+    gen_since: float = 0.0
     boxes: list[AttentionBox] = field(default_factory=list)
     vectors: list[SteerVector] = field(default_factory=list)
     pins: list[str] = field(default_factory=list)
@@ -103,8 +112,23 @@ class Console:
         self.boxes = [b for b in self.boxes if b.id != box_id]
         self.touch()
 
-    def add_vector(self, label: str, plus: str, minus: str, magnitude: float = 0.0) -> SteerVector:
-        v = SteerVector(label=label, plus=plus, minus=minus, magnitude=magnitude)
+    def add_vector(
+        self,
+        label: str,
+        plus: str,
+        minus: str,
+        magnitude: float = 0.0,
+        source: str = "",
+        attested: bool = True,
+    ) -> SteerVector:
+        v = SteerVector(
+            label=label,
+            plus=plus,
+            minus=minus,
+            magnitude=magnitude,
+            source=source,
+            attested=attested,
+        )
         self.vectors.append(v)
         self.touch()
         return v
@@ -114,6 +138,7 @@ class Console:
             if v.id == vec_id:
                 if magnitude is not None:
                     v.magnitude = max(-1.0, min(1.0, magnitude))
+                    v.manual = True
                 self.touch()
                 return
 

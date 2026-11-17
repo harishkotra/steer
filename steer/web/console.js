@@ -18,13 +18,14 @@ let doc = '';
 let words = [];
 let lines = [];
 let shift = 0;
+let revealTop = null; // set when the user clicks a claim: hold that part of the text still
 let audit = null;
 let meta = {};
 let vectors = [];
 let boxes = [];
 let pins = [];
 let generating = false;
-let autogen = true;
+let autogen = false; // the reader decides when the next paragraph happens
 let ws = null;
 let dirty = true;
 let errText = '';
@@ -38,7 +39,8 @@ function connect() {
   ws = new WebSocket(`${proto}://${location.host}/ws`);
 
   ws.onopen = () => {
-    if (autogen) setTimeout(() => send({ cmd: 'generate', tokens: 150 }), 600);
+    // one short opening paragraph, once, so the page is alive on arrival
+    if (!doc.trim()) setTimeout(() => send({ cmd: 'generate', tokens: 90 }), 600);
   };
 
   ws.onmessage = (ev) => {
@@ -49,10 +51,18 @@ function connect() {
       audit = msg.audit;
       vectors = msg.vectors || (msg.audit && msg.audit.vectors) || vectors;
       renderDock();
+      // the dials are the point of the app: they are on screen unless the
+      // reader deliberately folds them away with Tab
+      if (!/[?&]fold=1/.test(location.search)) dockEl.classList.remove('hidden');
       schedule();
     } else if (msg.type === 'delta') {
+      revealTop = null;
       doc += msg.text;
       if (doc.length > MAX_DOC) doc = doc.slice(-10000);
+      schedule();
+    } else if (msg.type === 'vectors') {
+      vectors = msg.vectors || vectors;
+      renderDock();
       schedule();
     } else if (msg.type === 'audit') {
       audit = msg;
@@ -68,6 +78,9 @@ function connect() {
     } else if (msg.type === 'status') {
       generating = msg.generating;
       schedule();
+      // never start the next paragraph on its own during a first visit: the
+      // dials arrive mid-stream and anything written before you touch them is
+      // evidence that the dial did nothing
       if (!generating && autogen) setTimeout(() => send({ cmd: 'generate', tokens: 150 }), 500);
     } else if (msg.type === 'reset') {
       doc = msg.doc;
@@ -151,8 +164,10 @@ function measure() {
   textEl.style.transform = 'translateY(0px)';
   const h = textEl.getBoundingClientRect().height;
   const lh = 25.5;
-  const need = Math.max(0, h - proseEl.clientHeight + lh);
+  const need = Math.max(0, h - proseEl.clientHeight + lh * 1.6);
   shift = Math.ceil(need / lh) * lh;
+  // a click on a claim parks the view on that sentence until the next write
+  if (revealTop !== null) shift = Math.min(shift, revealTop);
   textEl.style.transform = `translateY(${-shift}px)`;
 
   lines = [];
@@ -184,7 +199,9 @@ function renderRail() {
     let cells = '';
     for (let c = 0; c < n; c++) {
       const v = Math.max(0.06, Math.min(1, line.score * (0.6 + ((c * 7 + i * 3) % 11) / 14)));
-      const shade = Math.round(34 + v * 148);
+      // 34 made half the rail invisible on a laptop screen; the bar has to
+      // carry the reading, not the caption
+      const shade = Math.round(62 + v * 148);
       const w = c % 5 === 4 ? 5 : 6;
       cells += `<i class="cell" style="background:rgb(${shade},${shade},${shade});width:${w}px"></i>`;
     }
@@ -246,8 +263,9 @@ function drawOverlay() {
     }));
   }
 
-  // the vertical guide stops at the roll so it never crosses a character
-  overlay.appendChild(el('line', { x1: ix, y1: 0, x2: ix, y2: Math.round(band.top - 16), class: 'cross' }));
+  // the vertical guide is a connector to the instrument, not a page divider:
+  // a full-height rule down the middle of the text reads as a layout bug
+  overlay.appendChild(el('line', { x1: ix, y1: Math.round(band.top - 150), x2: ix, y2: Math.round(band.top - 16), class: 'cross' }));
   overlay.appendChild(el('line', { x1: LEFT_LIMIT - 64, y1: cy, x2: W - 24, y2: cy, class: 'cross' }));
 
   // leader lines from every live box and from the strongest clauses
@@ -262,9 +280,12 @@ function drawOverlay() {
     const rect = rectForRange(s.start, s.end);
     if (rect) anchors.push({ x: rect.x + rect.width / 2, y: rect.y + rect.height, w: s.score });
   }
+  const rollBottom = rollBox.bottom - sbox.top;
   for (const a of anchors.slice(0, 9)) {
     overlay.appendChild(el('line', {
-      x1: a.x, y1: a.y, x2: ix, y2: cy - 4, class: 'leader',
+      // leaders start below the roll: a dashed line through the paragraph
+      // looks like the text is being crossed out
+      x1: a.x, y1: Math.max(a.y, rollBottom), x2: ix, y2: cy - 4, class: 'leader',
       opacity: String(Math.min(0.5, 0.16 + a.w * 0.35)),
     }));
   }
@@ -331,9 +352,14 @@ function drawDial(cx, cy, W, H) {
     g.appendChild(t);
   }
 
+  // what this ring is, in words: it describes the passage, it is not a control
+  const cap = el('text', { x: c.cx, y: c.cy - rMax * 1.28, class: 'chart-key', 'text-anchor': 'middle' });
+  cap.textContent = 'the shape of the story so far';
+  g.appendChild(cap);
+
   for (const deg of [104, 122, 142, 162, 186, 208, 228, 250, 272]) {
     const [x0, y0] = polar(c.cx, c.cy, deg, rMax * 0.13);
-    const [x1, y1] = polar(c.cx, c.cy, deg, rMax * 1.02);
+    const [x1, y1] = polar(c.cx, c.cy, deg, rMax * 0.86);
     g.appendChild(el('line', { x1: x0, y1: y0, x2: x1, y2: y1, class: 'spoke' }));
   }
 
@@ -368,14 +394,17 @@ function drawDial(cx, cy, W, H) {
   if (m.tension) label(196, rMax * 1.2, `tension: ${m.tension.label}`, 'end');
   if (m.surprise) label(12, rMax * 1.2, `surprise: ${m.surprise.label}`, 'start');
   if (m.pace) label(132, rMax * 1.5, `pace: ${m.pace.label}`, 'end');
-  label(90, rMax * 0.46, 'dialogue', 'middle', 'chart-key', 4);
+  label(102, rMax * 0.5, 'dialogue', 'start', 'chart-key', 4);
 
   // the tag labels the arc from outside it, on a short leader, so the arc reads whole
-  const tagR = dialR + 42;
+  const tagR = dialR + 54;
   const [ax, ay] = polar(c.cx, c.cy, 40, dialR + 7);
   const [cx2, cy2] = polar(c.cx, c.cy, 40, tagR - 11);
-  g.appendChild(el('line', { x1: ax, y1: ay, x2: cx2, y2: cy2, class: 'badge-lead' }));
-  const [bx, by] = polar(c.cx, c.cy, 40, tagR);
+  // lift the chip clear of the verification ledger below the chart
+  const tagDy = 0;
+  g.appendChild(el('line', { x1: ax, y1: ay, x2: cx2, y2: cy2 + tagDy, class: 'badge-lead' }));
+  const [bx, byRaw] = polar(c.cx, c.cy, 40, tagR);
+  const by = byRaw + tagDy;
   const txt = mode.label;
   const bw = txt.length * 6.4 + 14;
   const bx2 = Math.max(10, Math.min(W - bw - 96, bx - bw / 2));
@@ -391,23 +420,21 @@ function drawDial(cx, cy, W, H) {
 
 function renderBadges() {
   const rows = [];
-  const active = (audit && audit.vectors) || [];
+  // the dock already lists each dial and its strength; the only overlay worth
+  // keeping is the mode the passage is running in
+  const m = audit?.metrics?.mode;
+  badgesEl.innerHTML = m
+    ? `<div class="badge">mode: ${m.label} <span class="pct">${Math.round(m.value * 100)}%</span></div>`
+    : '';
+}
 
-  active.forEach((v, i) => {
-    rows.push(
-      `<div class="badge" style="top:${i * 27}px">` +
-      `${v.label}: ${v.pole} <span class="pct">${Math.round(v.realized * 100)}%</span></div>`
-    );
-  });
-
-  if (audit?.metrics?.mode) {
-    const m = audit.metrics.mode;
-    rows.push(
-      `<div class="badge" style="top:${active.length * 27 + 10}px">` +
-      `mode: ${m.label} <span class="pct">${Math.round(m.value * 100)}%</span></div>`
-    );
-  }
-  badgesEl.innerHTML = rows.join('');
+function renderControls() {
+  const go = $('#go');
+  const halt = $('#halt');
+  if (!go || !halt) return;
+  go.hidden = generating;
+  halt.hidden = !generating;
+  go.textContent = doc.length < 200 ? 'start writing' : 'write more';
 }
 
 function renderStatus() {
@@ -418,24 +445,24 @@ function renderStatus() {
   const tokens = a.tokens ?? 0;
   const c = a.counters || {};
   const bits = [
-    `<span>≈ <b>${rate > 0 ? rate.toFixed(0) : '—'}</b> w/s</span>`,
-    `<span>≈ <b>${lat > 0 ? lat.toFixed(1) : '—'}</b> ms</span>`,
-    `<span><b>${words}</b>/<b>${tokens}</b></span>`,
-    `<span>box <b>${c.box ?? 0}</b></span>`,
-    `<span>steer <b>${c.steer ?? 0}</b></span>`,
-    `<span>pin <b>${c.pin ?? 0}</b></span>`,
-    `<span>${generating ? '<span class="red">/ writing</span>' : '/ idle'}</span>`,
+    `<span><b>${words}</b> words</span>`,
+    `<span><b>${c.steer ?? 0}</b> dials</span>`,
+    `<span><b>${c.box ?? 0}</b> attention box${(c.box ?? 0) === 1 ? '' : 'es'}</span>`,
+    `<span>${rate > 0 ? rate.toFixed(0) : '—'} w/s</span>`,
+    `<span>${lat > 0 ? lat.toFixed(1) : '—'} ms</span>`,
+    `<span>${generating ? '<span class="red">writing…</span>' : 'idle'}</span>`,
   ];
   if (errText) bits.push(`<span class="err">${errText}</span>`);
   bits.push('<span class="grow"></span>');
-  bits.push(`<span>${meta.provider || 'mock'} · ${meta.model || 'corpus'}</span>`);
+  bits.push(`<span>${meta.activation ? 'real activations' : 'prompt-compiled'} · ${meta.provider || 'mock'} · ${meta.model || 'corpus'}</span>`);
+  bits.push('<span class="by">idea: <a href="https://github.com/chuanqisun/spaceship" target="_blank" rel="noopener">Spaceship IDE</a> by <a href="https://chuanqisun.com" target="_blank" rel="noopener">Chuanqi Sun</a> · built by <a href="https://harishkotra.me" target="_blank" rel="noopener">Harish Kotra</a> · <a href="https://dailybuild.xyz" target="_blank" rel="noopener">other builds</a></span>');
   statusEl.innerHTML = bits.join('');
 }
 
 // ---------------------------------------------------------------- dock
 
 function renderDock() {
-  $('#dock-note').textContent = meta.note || meta.model || '';
+  $('#dock-note').textContent = 'mined from the passage';
 
   const list = $('#vec-list');
   const items = vectors.map((v) => {
@@ -444,33 +471,50 @@ function renderDock() {
     return `
       <div class="vec" data-id="${v.id}">
         <div class="top"><span>${v.label} → ${side}</span><span><em>${pct}%</em>
-          <button data-del="${v.id}">×</button></span></div>
+          <button data-del="${v.id}" title="remove this dial">×</button></span></div>
         <div class="poles"><span>${v.plus}</span><span>${v.minus}</span></div>
+        <div class="src" data-sentence="${esc(v.source || '')}" title="click to show this sentence in your text">${v.attested === false ? '<em title="the opposite end never appears in your text, so this end was guessed">guessed</em> · ' : ''}${v.source ? 'found in: ' + clip(v.source, 108) : '<em>you added this</em>'}</div>
         <input type="range" min="-100" max="100" value="${Math.round(v.magnitude * 100)}" data-slider="${v.id}" />
       </div>`;
   });
-  list.innerHTML = items.join('') || '<div class="empty">no vectors yet — add one below, or select text to steer</div>';
+  list.innerHTML = items.join('') || '<div class="empty">no dials yet — write a few sentences and they get mined from your text</div>';
 
   list.querySelectorAll('input[data-slider]').forEach((input) => {
     input.addEventListener('input', () => {
       send({ cmd: 'vector', action: 'set', id: input.dataset.slider, magnitude: +input.value / 100 });
       const row = input.closest('.vec');
       row.querySelector('.top em').textContent = `${Math.abs(+input.value)}%`;
-      row.querySelector('.top span').textContent =
-        `${vectors.find((v) => v.id === input.dataset.slider).label} → ${+input.value >= 0 ? 'plus' : 'minus'}`;
+      const vv = vectors.find((v) => v.id === input.dataset.slider);
+      if (vv) row.querySelector('.top span').textContent = `${vv.label} → ${+input.value >= 0 ? vv.plus : vv.minus}`;
     });
   });
+  list.querySelectorAll('.src[data-sentence]').forEach((el) => {
+    el.addEventListener('click', () => revealSentence(el.dataset.sentence));
+  });
+
   list.querySelectorAll('button[data-del]').forEach((b) => {
     b.addEventListener('click', () => send({ cmd: 'vector', action: 'remove', id: b.dataset.del }));
   });
 
   const bl = $('#box-list');
-  bl.innerHTML = boxes.map((b) => `
+  const lifts = {};
+  (audit && audit.attention ? audit.attention : []).forEach((a) => { lifts[a.id] = a; });
+  bl.innerHTML = boxes.map((b) => {
+    const l = lifts[b.id];
+    const tag = !l
+      ? ''
+      : l.lift >= 1.15
+        ? `<em class="held">×${l.lift}</em>`
+        : l.lift < 0.05
+          ? '<em class="weak">no pull yet</em>'
+          : `<em class="weak">×${l.lift}</em>`;
+    return `
     <div class="box" data-id="${b.id}">
-      <span title="${b.text}">“${b.text.slice(0, 34)}”</span>
+      <span title="${b.text}">“${b.text.slice(0, 30)}” ${tag}</span>
       <input type="range" min="0" max="150" value="${Math.round(b.weight * 100)}" data-boxw="${b.id}" />
       <button data-boxdel="${b.id}">×</button>
-    </div>`).join('') || '<div class="empty">select text in the prose to pin attention</div>';
+    </div>`;
+  }).join('') || '<div class="empty">select text in the prose to pin attention</div>';
 
   bl.querySelectorAll('input[data-boxw]').forEach((input) => {
     input.addEventListener('input', () =>
@@ -482,6 +526,42 @@ function renderDock() {
 }
 
 // ---------------------------------------------------------------- loop
+
+function clip(text, n) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (t.length <= n) return esc(t);
+  const cut = t.slice(0, n);
+  const at = cut.lastIndexOf(' ');
+  return esc(at > n * 0.6 ? cut.slice(0, at) : cut) + '…';
+}
+
+function esc(t) {
+  return String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+function renderLedger() {
+  const box = $('#ledger');
+  if (!box) return;
+  const v = audit && audit.verification;
+  if (!v || !v.claims || !v.claims.length) {
+    box.innerHTML = '';
+    return;
+  }
+  const rows = v.claims.slice(-3).map((c) => `
+    <div class="row ${c.realized ? 'ok' : 'miss'}" data-sentence="${esc(c.sentence)}" title="click to show this sentence in the text">
+      <span class="mk">${c.realized ? '✓' : '·'}</span>
+      <span class="vx">${c.realized ? esc(c.vector) + ' → ' + esc(c.pole) : 'unclaimed'}</span>
+      <span class="sh" title="how much of this sentence leans the dial's way">${c.share.toFixed(2)}</span>
+      <span class="tx">${esc(c.sentence)}</span>
+    </div>`).join('');
+  box.innerHTML =
+    `<header>did the dials land? <em>${esc(v.note)}</em></header>${rows}` +
+    `<div class="foot">score: how much of that sentence leans the dial's way · 1.00 = all of it</div>`;
+
+  box.querySelectorAll('.row[data-sentence]').forEach((row) => {
+    row.addEventListener('click', () => revealSentence(row.dataset.sentence));
+  });
+}
 
 function schedule() {
   dirty = true;
@@ -495,16 +575,37 @@ function frame() {
     renderRail();
     drawOverlay();
     renderBadges();
+    renderLedger();
+    renderControls();
     renderStatus();
     paintClasses();
   }
   requestAnimationFrame(frame);
 }
 
+// ---------------------------------------------------------------- reveal
+
+// a claim is only useful if you can see the sentence it is talking about
+function revealSentence(sentence) {
+  const probe = sentence.trim().split(/\s+/).slice(0, 4).join(' ').toLowerCase();
+  if (!probe) return;
+  const at = doc.toLowerCase().indexOf(probe);
+  if (at < 0) return;
+  const hit = words.filter((w) => +w.dataset.s >= at && +w.dataset.s < at + sentence.length);
+  if (!hit.length) return;
+  revealTop = Math.max(0, hit[0].offsetTop - proseEl.clientHeight * 0.45);
+  hit.forEach((w) => w.classList.add('flash'));
+  measure();
+  setTimeout(() => hit.forEach((w) => w.classList.remove('flash')), 2200);
+}
+
 // ---------------------------------------------------------------- input
 
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input, textarea')) return;
+  // the blind-test panel owns the keyboard while it is open, or space would
+  // start writing behind the question
+  if (!document.querySelector('#blind').classList.contains('hidden')) return;
   if (e.code === 'Space') {
     e.preventDefault();
     send({ cmd: 'generate', tokens: 150 });
@@ -554,6 +655,164 @@ $('#vec-add').addEventListener('submit', (e) => {
 
 $('#autogen').addEventListener('change', (e) => { autogen = e.target.checked; });
 $('#reset').addEventListener('click', () => send({ cmd: 'reset', seed: 'keeper' }));
+$('#go').addEventListener('click', () => send({ cmd: 'generate', tokens: 150 }));
+$('#halt').addEventListener('click', () => send({ cmd: 'stop' }));
+
+// the first thing anyone needs is "what is this and where do I press"
+const tourEl = $('#tour');
+function showTour() { tourEl.classList.remove('hidden'); }
+function hideTour() {
+  tourEl.classList.add('hidden');
+  try { localStorage.setItem('steer.tour', '1'); } catch (e) { /* private mode */ }
+}
+$('#tourbtn').addEventListener('click', showTour);
+$('#tourdone').addEventListener('click', hideTour);
+tourEl.addEventListener('click', (e) => { if (e.target === tourEl) hideTour(); });
+try {
+  const seen = localStorage.getItem('steer.tour');
+} catch (e) { /* ignore */ }
+let seenTour = false;
+try { seenTour = localStorage.getItem('steer.tour') === '1'; } catch (e) { /* ignore */ }
+if (!seenTour || location.search.includes('tour=1')) showTour();
+
+// ---------- blind test ----------
+// Two futures from the same passage, one of them steered. The server keeps the
+// answer until a pick comes back, so there is nothing to cheat with here: the
+// page only ever holds two paragraphs of prose.
+const blindEl = $('#blind');
+const blindOut = $('#blind-out');
+const blindAgain = $('#blindagain');
+let blindRound = null;
+const tally = { hit: 0, n: 0 };
+
+function blindSide(name) { return blindEl.querySelector(`.side[data-side="${name}"]`); }
+
+function setSide(name, text, loading) {
+  const node = blindSide(name);
+  node.classList.remove('done', 'steered', 'wrong', 'picked');
+  const body = node.querySelector('.body');
+  body.classList.toggle('loading', !!loading);
+  body.textContent = text;
+  const pick = node.querySelector('.pick');
+  pick.disabled = !!loading;
+  pick.textContent = 'pick ' + name.toUpperCase();
+}
+
+function tallyText() {
+  $('#blind-tally').textContent = tally.n
+    ? `you called ${tally.hit} of ${tally.n} so far`
+    : 'no guesses yet — the answer sits on the server';
+}
+
+function blindBusy(text) {
+  setSide('left', text, true);
+  setSide('right', '', true);
+}
+
+async function deal() {
+  blindEl.classList.remove('hidden');
+  blindOut.hidden = true;
+  blindAgain.hidden = true;
+  blindRound = null;
+  blindBusy('writing two futures from the same words…');
+  // a blind test over a passage that is still growing is not a fair test:
+  // stop the stream, let the server settle, then deal
+  if (generating) {
+    send({ cmd: 'stop' });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  let data = null;
+  // the stop is asynchronous on the server; give it a few beats before giving up
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const res = await fetch('/api/blind', { method: 'POST' });
+      data = await res.json();
+    } catch (e) { data = null; }
+    if (data && !data.error) break;
+    if (data && data.error && !/sit still/.test(data.error)) break;
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  if (!data || data.error) {
+    blindBusy((data && data.error) || 'the server did not answer.');
+    return;
+  }
+  blindRound = data;
+  setSide('left', data.sides.left, false);
+  setSide('right', data.sides.right, false);
+  tallyText();
+}
+
+async function guess(side) {
+  if (!blindRound) return;
+  blindBusy('reading both back…');
+  let r = null;
+  try {
+    const res = await fetch(`/api/blind/${blindRound.round}/${side}`, { method: 'POST' });
+    r = await res.json();
+  } catch (e) { /* server gone */ }
+  if (!r || r.error) {
+    blindBusy((r && r.error) || 'the server did not answer.');
+    return;
+  }
+  tally.n += 1;
+  if (r.correct) tally.hit += 1;
+
+  // put the text back before painting verdicts on it
+  for (const name of ['left', 'right']) setSide(name, r.sides[name].text, false);
+
+  const toward = (name) => r.sides[name].toward;
+  for (const name of ['left', 'right']) {
+    const node = blindSide(name);
+    node.classList.add('done');
+    if (name === r.answer) node.classList.add('steered');
+    if (name === r.pick && !r.correct) node.classList.add('wrong');
+  }
+
+  const poleName = r.axis.pole;
+  const a = toward(r.answer);
+  const b = toward(r.answer === 'left' ? 'right' : 'left');
+  const margin = Math.abs(a - b);
+  const words = margin > 0.3 ? 'a wide gap' : margin > 0.12 ? 'a real gap' : 'barely a gap';
+  const pct = (x) => `${Math.round(x * 100)}%`;
+
+  blindOut.innerHTML = `
+    <p>the dial was <b class="ok">${esc(r.axis.label)} → ${esc(poleName)}</b>, strength ${r.axis.strength.toFixed(2)}.
+    ${r.correct ? `<b>you picked it — the ${r.answer} card.</b>` : `<b>it was the ${r.answer} card.</b>`}
+    ${esc(words)} between the two texts.</p>
+    <div class="metrics">
+      <div class="m">the steered one (${r.answer}) · ${pct(a)} toward ${esc(poleName)}
+        <div class="bar"><i style="width:${Math.round(a * 100)}%"></i></div></div>
+      <div class="m">the plain one (${r.answer === 'left' ? 'right' : 'left'}) · ${pct(b)} toward ${esc(poleName)}
+        <div class="bar"><i style="width:${Math.round(b * 100)}%"></i></div></div>
+    </div>
+    <p class="m">same words in, same model, one dial. this is the only difference the audit can find.</p>`;
+  blindOut.hidden = false;
+  blindAgain.hidden = false;
+  tallyText();
+}
+
+$('#blindbtn').addEventListener('click', () => {
+  // a tally carried over from a closed panel reads like a pre-filled result
+  tally.hit = 0;
+  tally.n = 0;
+  tallyText();
+  deal();
+});
+$('#blindagain').addEventListener('click', deal);
+$('#blindclose').addEventListener('click', () => blindEl.classList.add('hidden'));
+blindEl.addEventListener('click', (e) => { if (e.target === blindEl) blindEl.classList.add('hidden'); });
+blindEl.querySelectorAll('.pick').forEach((btn) => {
+  btn.addEventListener('click', () => guess(btn.closest('.side').dataset.side));
+});
+window.addEventListener('keydown', (e) => {
+  if (blindEl.classList.contains('hidden')) return;
+  if (e.key === 'Escape') { blindEl.classList.add('hidden'); return; }
+  // the panel is a question: L and R answer it while it is open
+  if (!blindRound || !blindOut.hidden) return;
+  const k = e.key.toLowerCase();
+  if (k === 'l' || k === 'arrowleft') guess('left');
+  if (k === 'r' || k === 'arrowright') guess('right');
+});
 
 window.addEventListener('resize', schedule);
 
